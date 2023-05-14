@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use hyper::{
     body::HttpBody,
-    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT},
     Body, Client, Request,
 };
 use rocket::http::ext::IntoOwned;
@@ -24,6 +24,7 @@ use super::{Adapter, Error, ErrorKind, OAuthConfig, TokenRequest, TokenResponse}
 #[derive(Clone, Debug)]
 pub struct HyperRustlsAdapter {
     use_basic_auth: bool,
+    user_agent: Option<String>,
     client: Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>,
 }
 
@@ -31,6 +32,7 @@ impl Default for HyperRustlsAdapter {
     fn default() -> Self {
         Self {
             use_basic_auth: true,
+            user_agent: None,
             // TODO: consider making the root store configurable
             client: Client::builder().build(
                 hyper_rustls::HttpsConnectorBuilder::new()
@@ -73,6 +75,13 @@ impl HyperRustlsAdapter {
     pub fn basic_auth(self, use_basic_auth: bool) -> Self {
         Self {
             use_basic_auth,
+            ..self
+        }
+    }
+
+    pub fn user_agent(self, user_agent: &str) -> Self {
+        Self {
+            user_agent: Some(user_agent.to_string()),
             ..self
         }
     }
@@ -134,7 +143,15 @@ impl Adapter for HyperRustlsAdapter {
 
         let mut request = Request::post(&*config.provider().token_uri())
             .header(ACCEPT, header::APPLICATION_JSON)
-            .header(CONTENT_TYPE, header::X_WWW_FORM_URLENCODED);
+            .header(CONTENT_TYPE, header::X_WWW_FORM_URLENCODED)
+            .header(
+                USER_AGENT,
+                if let Some(user_agent) = &self.user_agent {
+                    user_agent
+                } else {
+                    "rocket_oauth2"
+                },
+            );
 
         let req_str = {
             let mut ser = UrlSerializer::new(String::new());
