@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use hyper::{
     body::HttpBody,
-    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT},
     Body, Client, Request,
 };
 use rocket::http::ext::IntoOwned;
@@ -134,7 +134,8 @@ impl Adapter for HyperRustlsAdapter {
 
         let mut request = Request::post(&*config.provider().token_uri())
             .header(ACCEPT, header::APPLICATION_JSON)
-            .header(CONTENT_TYPE, header::X_WWW_FORM_URLENCODED);
+            .header(CONTENT_TYPE, header::X_WWW_FORM_URLENCODED)
+            .header(USER_AGENT, "Notado 1.0 by /u/notado_app");
 
         let req_str = {
             let mut ser = UrlSerializer::new(String::new());
@@ -171,11 +172,15 @@ impl Adapter for HyperRustlsAdapter {
             .body(Body::from(req_str))
             .map_err(|e| Error::new_from(ErrorKind::ExchangeFailure, e))?;
 
+        dbg!(&request);
+
         let response = self
             .client
             .request(request)
             .await
             .map_err(|e| Error::new_from(ErrorKind::ExchangeFailure, e))?;
+
+        dbg!(&response);
         if !response.status().is_success() {
             return Err(Error::new(ErrorKind::ExchangeError(
                 response.status().as_u16(),
